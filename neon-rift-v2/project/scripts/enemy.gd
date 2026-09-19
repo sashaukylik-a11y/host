@@ -16,6 +16,9 @@ func _ready() -> void:
 	add_to_group("enemy")
 	gravity = float(ProjectSettings.get_setting("physics/3d/default_gravity", 9.8))
 	target = get_tree().get_first_node_in_group("player")
+	var body := get_node_or_null("Body") as MeshInstance3D
+	if body != null and body.material_override != null:
+		body.material_override = body.material_override.duplicate()
 
 func _physics_process(delta: float) -> void:
 	if dead or target == null:
@@ -56,12 +59,14 @@ func take_damage(amount: int, _hit_position := Vector3.ZERO) -> void:
 	awake = true
 	hp -= amount
 	var body := get_node_or_null("Body") as MeshInstance3D
-	if body != null:
-		var original := body.modulate
-		body.modulate = Color(1.0, 0.2, 0.12)
+	if body != null and body.material_override is StandardMaterial3D:
+		var mat := body.material_override as StandardMaterial3D
+		var original := mat.albedo_color
+		mat.albedo_color = Color(0.85, 0.08, 0.03)
+		get_tree().current_scene.play_sfx("hit")
 		await get_tree().create_timer(0.06).timeout
 		if is_instance_valid(body):
-			body.modulate = original
+			mat.albedo_color = original
 	if hp <= 0:
 		die()
 
