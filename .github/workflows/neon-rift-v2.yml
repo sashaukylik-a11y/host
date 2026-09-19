@@ -7,6 +7,10 @@ on:
       - "neon-rift-v2/**"
       - ".github/workflows/neon-rift-v2.yml"
 
+concurrency:
+  group: neon-rift-v2-build
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
