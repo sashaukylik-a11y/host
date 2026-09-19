@@ -40,6 +40,7 @@ type Game struct{
 	h syscall.Handle; dc syscall.Handle; w,hgt int; pix []uint32; running,locked bool
 	x,y,a,pitch float64; hp,ammo,reserve int; weapon int; objective int; power,flash,key bool; modules int
 	enemies []Enemy; keysPrev map[int]bool; save Save; start time.Time; note string; noteT float64
+	overlay []ov
 }
 
 var G *Game
@@ -194,5 +195,20 @@ func (g *Game) makeWindow()error{
 	g.w,g.hgt=1280,720;r,_,e:=create.Call(0,uintptr(unsafe.Pointer(name)),uintptr(unsafe.Pointer(U("NEON RIFT: ABANDONED — MonoSystem"))),WS_OVERLAPPEDWINDOW|WS_VISIBLE,120,80,uintptr(g.w),uintptr(g.hgt),0,0,inst,0);if r==0{return e}
 	g.h=syscall.Handle(r);d,_,_:=getdc.Call(uintptr(g.h));g.dc=syscall.Handle(d);g.pix=make([]uint32,g.w*g.hgt);show.Call(uintptr(g.h),SW_SHOW);upd.Call(uintptr(g.h));return nil
 }
-func (g *Game) loop(){g.running=true;last:=time.Now();var m Msg;for g.running{for{r,_,_:=peek.Call(uintptr(unsafe.Pointer(&m)),0,0,0,PM_REMOVE);if r==0{break};trans.Call(uintptr(unsafe.Pointer(&m)));disp.Call(uintptr(unsafe.Pointer(&m))};now:=time.Now();dt:=now.Sub(last).Seconds();last=now;if dt>.05{dt=.05};g.update(dt);g.render();g.blitOverlay();time.Sleep(4*time.Millisecond)}}
+func (g *Game) loop(){
+	g.running=true
+	last:=time.Now()
+	var m Msg
+	for g.running{
+		for{
+			r,_,_:=peek.Call(uintptr(unsafe.Pointer(&m)),0,0,0,PM_REMOVE)
+			if r==0{break}
+			trans.Call(uintptr(unsafe.Pointer(&m)))
+			disp.Call(uintptr(unsafe.Pointer(&m)))
+		}
+		now:=time.Now();dt:=now.Sub(last).Seconds();last=now
+		if dt>.05{dt=.05}
+		g.update(dt);g.render();g.blitOverlay();time.Sleep(4*time.Millisecond)
+	}
+}
 func main(){g:=&Game{keysPrev:map[int]bool{}};G=g;g.load();if e:=g.makeWindow();e!=nil{return};defer releasedc.Call(uintptr(g.h),uintptr(g.dc));g.init();g.loop()}
