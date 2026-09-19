@@ -107,6 +107,7 @@ func fire() -> void:
 		return
 	ammo -= 1
 	ammo_changed.emit(ammo, reserve_ammo)
+	get_tree().current_scene.play_sfx("shoot")
 	can_fire = false
 	muzzle.visible = true
 	muzzle_light.visible = true
@@ -134,6 +135,7 @@ func reload_weapon() -> void:
 		return
 	reloading = true
 	get_tree().current_scene.notify("Перезарядка…")
+	get_tree().current_scene.play_sfx("reload")
 	await get_tree().create_timer(0.85).timeout
 	var need := magazine_size - ammo
 	var moved := mini(need, reserve_ammo)
