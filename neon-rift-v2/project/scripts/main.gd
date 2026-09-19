@@ -25,7 +25,7 @@ var materials := {}
 var sfx_players := {}
 var ambient_player: AudioStreamPlayer
 
-var objective_positions := [
+var objective_positions: Array[Vector3] = [
 	Vector3(1.6, 1.0, -8.0),
 	Vector3(-2.0, 1.0, -17.0),
 	Vector3(2.8, 1.0, -22.0),
@@ -41,7 +41,7 @@ var objective_positions := [
 	Vector3(0.0, 1.0, -198.0)
 ]
 
-var objective_text := [
+var objective_text: Array[String] = [
 	"Найдите фонарик",
 	"Найдите предохранитель",
 	"Восстановите питание",
@@ -100,7 +100,7 @@ func create_environment() -> void:
 func create_audio() -> void:
 	for key in ["shoot", "hit", "pickup", "alarm", "reload"]:
 		var player_node := AudioStreamPlayer.new()
-		var path := "res://assets/audio/" + key + ".wav"
+		var path: String = "res://assets/audio/" + key + ".wav"
 		if ResourceLoader.exists(path):
 			player_node.stream = load(path)
 		player_node.volume_db = -8.0 if key == "shoot" else -5.0
@@ -218,7 +218,7 @@ func add_pipe_run(origin: Vector3, length: float) -> void:
 func add_warehouse_racks() -> void:
 	for side in [-1.0, 1.0]:
 		for z in [-31.0, -39.0, -49.0]:
-			var x := side * 6.0
+			var x: float = float(side) * 6.0
 			for h in [0.5, 1.7, 2.9]:
 				make_deco_box(Vector3(x, h, z), Vector3(2.4, 0.12, 5.0), materials["metal"])
 			for dz in [-2.3, 2.3]:
@@ -442,7 +442,7 @@ func create_objective_marker() -> void:
 func _process(delta: float) -> void:
 	if marker != null:
 		marker.rotation.y += delta * 1.4
-		var target := objective_positions[mini(objective_step, objective_positions.size() - 1)]
+		var target: Vector3 = objective_positions[mini(objective_step, objective_positions.size() - 1)]
 		marker.position = target + Vector3(0, 1.55 + sin(Time.get_ticks_msec() * 0.003) * 0.12, 0)
 	if player == null:
 		return
@@ -470,14 +470,14 @@ func update_zone() -> void:
 	zone_label.text = "ЗОНА: " + name
 
 func update_proximity_hint() -> void:
-	var target := objective_positions[mini(objective_step, objective_positions.size() - 1)]
+	var target: Vector3 = objective_positions[mini(objective_step, objective_positions.size() - 1)]
 	var dist := player.global_position.distance_to(target)
 	hint_label.text = "[E] Взаимодействовать" if dist < 2.4 and objective_step not in [3, 6, 9, 11, 12] else ""
 
 func try_interact(who: Node3D) -> void:
 	if who != player:
 		return
-	var target := objective_positions[mini(objective_step, objective_positions.size() - 1)]
+	var target: Vector3 = objective_positions[mini(objective_step, objective_positions.size() - 1)]
 	if player.global_position.distance_to(target) > 2.5:
 		notify("Подойдите ближе к объекту.")
 		return
