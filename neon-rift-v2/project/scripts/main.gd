@@ -22,6 +22,8 @@ var destroyed_enemies := 0
 var notice_generation := 0
 var story_nodes := {}
 var materials := {}
+var sfx_players := {}
+var ambient_player: AudioStreamPlayer
 
 var objective_positions := [
 	Vector3(1.6, 1.0, -8.0),
@@ -59,6 +61,7 @@ func _ready() -> void:
 	RenderingServer.set_default_clear_color(Color(0.004, 0.006, 0.011))
 	create_environment()
 	create_materials()
+	create_audio()
 	build_facility()
 	create_story_props()
 	create_player()
@@ -93,6 +96,29 @@ func create_environment() -> void:
 	moon.light_energy = 0.45
 	moon.shadow_enabled = true
 	add_child(moon)
+
+func create_audio() -> void:
+	for key in ["shoot", "hit", "pickup", "alarm", "reload"]:
+		var player_node := AudioStreamPlayer.new()
+		var path := "res://assets/audio/" + key + ".wav"
+		if ResourceLoader.exists(path):
+			player_node.stream = load(path)
+		player_node.volume_db = -8.0 if key == "shoot" else -5.0
+		add_child(player_node)
+		sfx_players[key] = player_node
+	ambient_player = AudioStreamPlayer.new()
+	if ResourceLoader.exists("res://assets/audio/ambient_technical.wav"):
+		ambient_player.stream = load("res://assets/audio/ambient_technical.wav")
+		ambient_player.volume_db = -18.0
+		ambient_player.finished.connect(ambient_player.play)
+		add_child(ambient_player)
+		ambient_player.play()
+
+func play_sfx(key: String) -> void:
+	if sfx_players.has(key):
+		var audio := sfx_players[key] as AudioStreamPlayer
+		audio.stop()
+		audio.play()
 
 func create_materials() -> void:
 	materials["concrete"] = make_material("res://assets/materials/concrete.png", Color(0.34, 0.35, 0.36), 0.05, 0.88)
@@ -498,6 +524,7 @@ func try_interact(who: Node3D) -> void:
 			start_defense()
 
 func hide_story(key: String) -> void:
+	play_sfx("pickup")
 	if story_nodes.has(key) and is_instance_valid(story_nodes[key]):
 		story_nodes[key].visible = false
 
@@ -511,6 +538,7 @@ func start_defense() -> void:
 		return
 	defense_started = true
 	objective_step = 11
+	play_sfx("alarm")
 	update_hud()
 	notify("ТРЕВОГА: ворота открываются. Удерживайте двор!", 6.0)
 	for pos in [Vector3(-8, 0.1, -169), Vector3(8, 0.1, -172), Vector3(-7, 0.1, -183), Vector3(6, 0.1, -189), Vector3(0, 0.1, -176)]:
