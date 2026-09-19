@@ -31,7 +31,7 @@ yellow=mat('Hazard',(.7,.45,.04),.35,.5)
 def bevel(obj,amt=.05):
     mod=obj.modifiers.new('EdgeBevel','BEVEL');mod.width=amt;mod.segments=2
     bpy.context.view_layer.objects.active=obj
-    bpy.ops.object.shade_smooth_by_angle()
+    bpy.ops.object.shade_smooth()
 
 def cube(name,loc,scale,material):
     bpy.ops.mesh.primitive_cube_add(location=loc)
