@@ -1,0 +1,52 @@
+name: Build NEON RIFT payload
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "neon-rift/**"
+      - ".github/workflows/neon-rift-release.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install generator dependency
+        run: python -m pip install --disable-pip-version-check numpy
+      - name: Generate game package
+        working-directory: neon-rift
+        run: python build_payload.py
+      - name: Audit payload
+        working-directory: neon-rift
+        run: |
+          python - <<'PY'
+          import json, pathlib, hashlib
+          d=pathlib.Path("dist")
+          m=json.loads((d/"manifest.json").read_text())
+          assert m["installed_bytes"] >= 3*1024*1024*1024, m["installed_bytes"]
+          assert len(m["parts"]) >= 1
+          for p in m["parts"]:
+              f=d/p["name"]
+              assert f.stat().st_size == p["size"]
+              assert hashlib.sha256(f.read_bytes()).hexdigest() == p["sha256"]
+          print("AUDIT PASS",m["installed_bytes"],len(m["parts"]))
+          PY
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: neon-rift
+        run: |
+          TAG="neon-rift-v1"
+          gh release delete "$TAG" --cleanup-tag -y 2>/dev/null || true
+          gh release create "$TAG" dist/manifest.json dist/NEON_RIFT_payload.part* --title "NEON RIFT: ABANDONED v1" --notes "MonoSystem game payload for the bootstrap installer."
