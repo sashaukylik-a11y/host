@@ -1,0 +1,98 @@
+name: Build NEON RIFT V2 Godot
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "neon-rift-v2/**"
+      - ".github/workflows/neon-rift-v2.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      GODOT_VERSION: "4.7.2"
+      GODOT_BIN: "/tmp/godot/Godot_v4.7.2-stable_linux.x86_64"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+
+      - name: Install audit and asset dependencies
+        run: |
+          python -m pip install --disable-pip-version-check numpy pillow gdtoolkit
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends blender unzip
+
+      - name: Generate runtime textures audio and icon
+        working-directory: neon-rift-v2
+        run: python tools/generate_game_assets.py
+
+      - name: Generate Blender GLB props
+        working-directory: neon-rift-v2
+        run: blender -b --python tools/blender_props.py -- "$(pwd)/project/assets/models"
+
+      - name: Source audit pass 1 - GDScript lint
+        working-directory: neon-rift-v2
+        run: |
+          gdlint project/scripts/*.gd
+          grep -RniE 'localhost|127\.0\.0\.1|https?://' project/scripts && exit 1 || true
+
+      - name: Download Godot 4.7.2 stable and templates
+        run: |
+          mkdir -p /tmp/godot /tmp/godot_templates
+          curl -L --retry 4 -o /tmp/godot/godot.zip "https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip"
+          unzip -q /tmp/godot/godot.zip -d /tmp/godot
+          chmod +x "$GODOT_BIN"
+          curl -L --retry 4 -o /tmp/godot/templates.tpz "https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz"
+          unzip -q /tmp/godot/templates.tpz -d /tmp/godot_templates
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.7.2.stable"
+          cp -a /tmp/godot_templates/templates/. "$HOME/.local/share/godot/export_templates/4.7.2.stable/"
+
+      - name: Source audit pass 2 - Godot import and parse
+        working-directory: neon-rift-v2
+        run: |
+          "$GODOT_BIN" --headless --editor --path project --quit 2>&1 | tee godot_import.log
+          ! grep -E "SCRIPT ERROR|Parse Error|ERROR:" godot_import.log
+
+      - name: Source audit pass 3 - headless scene smoke
+        working-directory: neon-rift-v2
+        run: |
+          timeout 25s "$GODOT_BIN" --headless --path project --quit-after 180 2>&1 | tee godot_smoke.log || test $? -eq 124
+          ! grep -E "SCRIPT ERROR|Parse Error|Invalid call|Invalid get index|ERROR:" godot_smoke.log
+
+      - name: Export Windows game
+        working-directory: neon-rift-v2
+        run: |
+          mkdir -p dist
+          "$GODOT_BIN" --headless --path project --export-release "Windows Desktop" "$(pwd)/dist/NEON_RIFT.exe" 2>&1 | tee godot_export.log
+          test -s dist/NEON_RIFT.exe
+          test -s dist/NEON_RIFT.pck
+          file dist/NEON_RIFT.exe | grep -qi "PE32"
+
+      - name: Build 6-8 GiB game package
+        working-directory: neon-rift-v2
+        run: python tools/build_release.py
+
+      - name: Full payload audit
+        working-directory: neon-rift-v2
+        run: python tools/audit_release.py
+
+      - name: Publish V2 release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: neon-rift-v2
+        run: |
+          TAG="neon-rift-v2"
+          gh release delete "$TAG" --cleanup-tag -y 2>/dev/null || true
+          gh release create "$TAG"             dist/manifest_v2.json             dist/NEON_RIFT_V2_AUDIT.txt             dist/NEON_RIFT_v2_payload.part*             --title "NEON RIFT: ABANDONED V2"             --notes "Godot native Windows rebuild. Improved dark industrial 3D scene, corrected FPS mouse control, story objectives, lighting, fog, weapon, enemies, Blender-generated props, local saves. Payload installs to 6-8 GiB."
