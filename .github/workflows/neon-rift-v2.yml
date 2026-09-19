@@ -40,7 +40,9 @@ jobs:
 
       - name: Generate Blender GLB props
         working-directory: neon-rift-v2
-        run: blender -b --python tools/blender_props.py -- "$(pwd)/project/assets/models"
+        run: |
+          blender -b --python tools/blender_props.py -- "$(pwd)/project/assets/models"
+          test "$(find project/assets/models -name '*.glb' | wc -l)" -ge 7
 
       - name: Source audit pass 1 - GDScript lint
         working-directory: neon-rift-v2
